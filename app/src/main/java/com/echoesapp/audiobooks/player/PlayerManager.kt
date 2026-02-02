@@ -287,7 +287,7 @@ class PlayerManager @Inject constructor(
     }
 
     /**
-     * Set sleep timer.
+     * Set sleep timer using predefined option.
      */
     fun setSleepTimer(option: SleepTimerOption) {
         when (option) {
@@ -302,14 +302,24 @@ class PlayerManager @Inject constructor(
                 }
                 _playbackState.update { it.copy(sleepTimerMinutes = -1) } // -1 indicates end of chapter
             }
-            else -> {
-                sleepTimer.start(option.minutes) {
-                    pause()
-                    _playbackState.update { it.copy(sleepTimerMinutes = null) }
-                }
-                _playbackState.update { it.copy(sleepTimerMinutes = option.minutes) }
-            }
+            else -> startSleepTimer(option.minutes)
         }
+    }
+
+    /**
+     * Start sleep timer with custom minutes.
+     */
+    fun startSleepTimer(minutes: Int) {
+        if (minutes <= 0) {
+            sleepTimer.cancel()
+            _playbackState.update { it.copy(sleepTimerMinutes = null) }
+            return
+        }
+        sleepTimer.start(minutes) {
+            pause()
+            _playbackState.update { it.copy(sleepTimerMinutes = null) }
+        }
+        _playbackState.update { it.copy(sleepTimerMinutes = minutes) }
     }
 
     /**

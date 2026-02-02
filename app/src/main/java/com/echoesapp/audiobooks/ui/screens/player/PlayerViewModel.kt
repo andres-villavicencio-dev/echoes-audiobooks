@@ -57,16 +57,14 @@ class PlayerViewModel @Inject constructor(
     }
 
     fun setSleepTimer(minutes: Int?) {
-        val option = when (minutes) {
-            null, 0 -> SleepTimerOption.OFF
-            15 -> SleepTimerOption.MINUTES_15
-            30 -> SleepTimerOption.MINUTES_30
-            45 -> SleepTimerOption.MINUTES_45
-            60 -> SleepTimerOption.MINUTES_60
-            -1 -> SleepTimerOption.END_OF_CHAPTER
-            else -> SleepTimerOption.OFF
+        when (minutes) {
+            null, 0 -> playerManager.setSleepTimer(SleepTimerOption.OFF)
+            -1 -> playerManager.setSleepTimer(SleepTimerOption.END_OF_CHAPTER)
+            else -> {
+                // Handle any minute value by starting timer directly
+                playerManager.startSleepTimer(minutes)
+            }
         }
-        playerManager.setSleepTimer(option)
         _showSleepTimerPicker.value = false
     }
 
