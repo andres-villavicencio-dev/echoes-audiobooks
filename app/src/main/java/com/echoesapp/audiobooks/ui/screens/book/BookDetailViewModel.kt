@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.echoesapp.audiobooks.data.repository.AudiobookRepository
 import com.echoesapp.audiobooks.domain.model.Audiobook
+import com.echoesapp.audiobooks.player.PlayerManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,7 @@ data class BookDetailUiState(
 class BookDetailViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     private val repository: AudiobookRepository,
+    private val playerManager: PlayerManager,
 ) : ViewModel() {
 
     private val bookId: String = savedStateHandle.get<String>("bookId") ?: ""
@@ -81,14 +83,15 @@ class BookDetailViewModel @Inject constructor(
 
     fun playBook() {
         val audiobook = _uiState.value.audiobook ?: return
-        val chapterId = _uiState.value.currentChapterId ?: audiobook.chapters.firstOrNull()?.id
-        
-        // TODO: Call PlayerManager to start playback
-        // playerManager.play(audiobook, chapterId)
+        playerManager.play(audiobook, startChapterIndex = 0)
     }
 
     fun playChapter(chapterId: String) {
+        val audiobook = _uiState.value.audiobook ?: return
+        val chapterIndex = audiobook.chapters.indexOfFirst { it.id == chapterId }
+        if (chapterIndex >= 0) {
+            playerManager.play(audiobook, startChapterIndex = chapterIndex)
+        }
         _uiState.update { it.copy(currentChapterId = chapterId) }
-        playBook()
     }
 }
