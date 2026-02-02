@@ -1,0 +1,54 @@
+# Built application files
+*.apk
+*.aar
+*.ap_
+*.aab
+
+# Files for the ART/Dalvik VM
+*.dex
+
+# Java class files
+*.class
+
+# Generated files
+bin/
+gen/
+out/
+build/
+
+# Gradle files
+.gradle/
+build/
+!gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# Local configuration file
+local.properties
+
+# Android Studio
+*.iml
+.idea/
+.navigation/
+captures/
+.externalNativeBuild/
+.cxx/
+*.hprof
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (remove if needed)
+google-services.json
+
+# Mac
+.DS_Store
+
+# Kotlin
+*.kotlin_module
+
+# Proguard
+proguard/
+
+# Room schema
+app/schemas/
