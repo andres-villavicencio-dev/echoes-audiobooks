@@ -40,9 +40,10 @@ class LibraryViewModel @Inject constructor(
                 repository.getContinueListening(5),
             ) { classics, aiStories, continueListening ->
                 LibraryState(
-                    classics = classics,
-                    aiStories = aiStories,
-                    continueListening = continueListening,
+                    // Deduplicate by ID to prevent UI duplication issues
+                    classics = classics.distinctBy { it.id },
+                    aiStories = aiStories.distinctBy { it.id },
+                    continueListening = continueListening.distinctBy { it.audiobook.id },
                     isLoading = false,
                 )
             }

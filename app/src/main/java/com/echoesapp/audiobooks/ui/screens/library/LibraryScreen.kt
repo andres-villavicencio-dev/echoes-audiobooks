@@ -122,6 +122,7 @@ private fun LibraryContent(
                     title = "Continue Listening",
                     items = continueListening,
                     onItemClick = onBookClick,
+                    keySelector = { it.audiobook.id },
                     itemContent = { progress ->
                         AudiobookCard(
                             audiobook = progress.audiobook,
@@ -141,6 +142,7 @@ private fun LibraryContent(
                     title = "Classics",
                     items = classics,
                     onItemClick = onBookClick,
+                    keySelector = { it.id },
                     itemContent = { audiobook ->
                         AudiobookCard(
                             audiobook = audiobook,
@@ -159,6 +161,7 @@ private fun LibraryContent(
                     title = "AI Stories",
                     items = aiStories,
                     onItemClick = onBookClick,
+                    keySelector = { it.id },
                     itemContent = { audiobook ->
                         AudiobookCard(
                             audiobook = audiobook,
@@ -177,6 +180,7 @@ private fun <T> LibrarySection(
     items: List<T>,
     onItemClick: (String) -> Unit,
     itemContent: @Composable (T) -> Unit,
+    keySelector: (T) -> Any,
 ) {
     Column {
         Text(
@@ -191,7 +195,10 @@ private fun <T> LibrarySection(
             contentPadding = PaddingValues(horizontal = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            items(items) { item ->
+            items(
+                items = items,
+                key = keySelector,
+            ) { item ->
                 itemContent(item)
             }
         }
