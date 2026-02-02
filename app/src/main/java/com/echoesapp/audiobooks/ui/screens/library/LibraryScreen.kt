@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.echoesapp.audiobooks.domain.model.Audiobook
 import com.echoesapp.audiobooks.domain.model.AudiobookProgress
+import com.echoesapp.audiobooks.ui.components.AdBanner
 import com.echoesapp.audiobooks.ui.components.AudiobookCard
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -66,6 +67,11 @@ fun LibraryScreen(
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background,
                 ),
+            )
+        },
+        bottomBar = {
+            AdBanner(
+                modifier = Modifier.fillMaxWidth(),
             )
         },
     ) { paddingValues ->

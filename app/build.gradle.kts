@@ -103,6 +103,9 @@ dependencies {
     // DataStore
     implementation(libs.datastore.preferences)
 
+    // Ads
+    implementation(libs.play.services.ads)
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
