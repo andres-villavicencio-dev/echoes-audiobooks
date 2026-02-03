@@ -34,24 +34,27 @@ class LibraryViewModel @Inject constructor(
 
     private fun observeLibrary() {
         viewModelScope.launch {
-            combine(
-                repository.getAudiobooksByCategory(Category.CLASSIC),
-                repository.getAudiobooksByCategory(Category.AI_STORY),
-                repository.getContinueListening(5),
-            ) { classics, aiStories, continueListening ->
-                LibraryState(
-                    // Deduplicate by ID to prevent UI duplication issues
-                    classics = classics.distinctBy { it.id },
-                    aiStories = aiStories.distinctBy { it.id },
-                    continueListening = continueListening.distinctBy { it.audiobook.id },
-                    isLoading = false,
-                )
-            }
-                .catch { e ->
-                    _uiState.update { it.copy(error = e.message, isLoading = false) }
+            // Observe classics
+            repository.getAudiobooksByCategory(Category.CLASSIC)
+                .catch { /* ignore errors, just show empty */ }
+                .collect { classics ->
+                    _uiState.update { it.copy(classics = classics.distinctBy { b -> b.id }, isLoading = false) }
                 }
-                .collect { state ->
-                    _uiState.value = state
+        }
+        viewModelScope.launch {
+            // Observe AI stories
+            repository.getAudiobooksByCategory(Category.AI_STORY)
+                .catch { /* ignore errors */ }
+                .collect { aiStories ->
+                    _uiState.update { it.copy(aiStories = aiStories.distinctBy { b -> b.id }, isLoading = false) }
+                }
+        }
+        viewModelScope.launch {
+            // Observe continue listening
+            repository.getContinueListening(5)
+                .catch { /* ignore errors */ }
+                .collect { continueListening ->
+                    _uiState.update { it.copy(continueListening = continueListening.distinctBy { p -> p.audiobook.id }) }
                 }
         }
     }

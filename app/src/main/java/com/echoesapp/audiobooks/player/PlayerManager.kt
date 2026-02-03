@@ -49,10 +49,18 @@ class PlayerManager @Inject constructor(
     private var currentAudiobook: Audiobook? = null
     private var currentChapterIndex: Int = 0
 
+    private var isInitialized = false
+
     init {
-        initializeController()
         observeSleepTimer()
         startPositionUpdates()
+    }
+
+    private fun ensureInitialized() {
+        if (!isInitialized) {
+            isInitialized = true
+            initializeController()
+        }
     }
 
     private fun initializeController() {
@@ -104,6 +112,7 @@ class PlayerManager @Inject constructor(
      * Start playing an audiobook from a specific chapter.
      */
     fun play(audiobook: Audiobook, startChapterIndex: Int = 0) {
+        ensureInitialized()
         currentAudiobook = audiobook
         currentChapterIndex = startChapterIndex.coerceIn(0, audiobook.chapters.lastIndex)
 
@@ -136,6 +145,7 @@ class PlayerManager @Inject constructor(
         chapterId: String,
         positionInChapter: Long,
     ) {
+        ensureInitialized()
         currentAudiobook = audiobook
         currentChapterIndex = audiobook.chapters.indexOfFirst { it.id == chapterId }
             .takeIf { it >= 0 } ?: 0
