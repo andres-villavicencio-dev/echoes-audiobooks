@@ -34,6 +34,9 @@ fun EchoesNavHost(
                 onBookClick = { bookId ->
                     navController.navigate(Screen.BookDetail.createRoute(bookId))
                 },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                },
                 onNavigateToPlayer = onNavigateToPlayer,
             )
         }

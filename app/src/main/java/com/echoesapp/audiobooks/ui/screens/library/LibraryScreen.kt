@@ -41,8 +41,8 @@ import com.echoesapp.audiobooks.ui.components.ContinueListeningCard
 @Composable
 fun LibraryScreen(
     onBookClick: (String) -> Unit,
+    onNavigateToSettings: () -> Unit,
     onNavigateToPlayer: () -> Unit,
-    onNavigateToSettings: () -> Unit = {},
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -62,6 +62,7 @@ fun LibraryScreen(
                         Icon(
                             imageVector = Icons.Default.Settings,
                             contentDescription = "Settings",
+                            tint = MaterialTheme.colorScheme.onBackground,
                         )
                     }
                 },
