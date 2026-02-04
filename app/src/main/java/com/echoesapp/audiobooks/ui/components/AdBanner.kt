@@ -14,16 +14,16 @@ import com.google.android.gms.ads.AdView
  * 
  * TODO: Replace with production ad unit ID before release:
  * - Create ad unit in AdMob console
- * - Replace TEST_BANNER_AD_UNIT_ID with real ID
+ * - Replace BANNER_AD_UNIT_ID with real ID
  */
 
 // Test ad unit ID - shows test ads that are safe to click
-private const val TEST_BANNER_AD_UNIT_ID = "ca-app-pub-3940256099942544/9214589741"
+private const val BANNER_AD_UNIT_ID = "ca-app-pub-3951830145090872/8540965143"
 
 @Composable
 fun AdBanner(
     modifier: Modifier = Modifier,
-    adUnitId: String = TEST_BANNER_AD_UNIT_ID,
+    adUnitId: String = BANNER_AD_UNIT_ID,
 ) {
     AndroidView(
         modifier = modifier.fillMaxWidth(),
@@ -48,7 +48,7 @@ fun AdBanner(
 @Composable
 fun AdaptiveAdBanner(
     modifier: Modifier = Modifier,
-    adUnitId: String = TEST_BANNER_AD_UNIT_ID,
+    adUnitId: String = BANNER_AD_UNIT_ID,
 ) {
     AndroidView(
         modifier = modifier.fillMaxWidth(),
