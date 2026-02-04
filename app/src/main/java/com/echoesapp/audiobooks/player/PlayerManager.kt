@@ -64,6 +64,9 @@ class PlayerManager @Inject constructor(
     private var currentAudiobook: Audiobook? = null
     private var currentChapterIndex: Int = 0
     
+    // Pending play action (for when controller isn't ready yet)
+    private var pendingPlayAction: (() -> Unit)? = null
+    
     // Session tracking
     private var currentSessionId: String? = null
     private var sessionStartTime: Long = 0L
@@ -95,6 +98,11 @@ class PlayerManager @Inject constructor(
             {
                 controller = controllerFuture?.get()
                 controller?.addListener(playerListener)
+                Log.d(TAG, "MediaController ready")
+                
+                // Execute any pending play action
+                pendingPlayAction?.invoke()
+                pendingPlayAction = null
             },
             MoreExecutors.directExecutor()
         )
@@ -235,10 +243,22 @@ class PlayerManager @Inject constructor(
             createMediaItem(audiobook, chapter, index)
         }
 
-        controller?.apply {
-            setMediaItems(mediaItems, currentChapterIndex, 0)
-            prepare()
-            play()
+        // Helper to start playback
+        val startPlayback: () -> Unit = {
+            controller?.apply {
+                setMediaItems(mediaItems, currentChapterIndex, 0)
+                prepare()
+                play()
+            }
+            Log.d(TAG, "Started playback: ${audiobook.title}, chapter $currentChapterIndex")
+        }
+
+        // If controller is ready, play now; otherwise queue for later
+        if (controller != null) {
+            startPlayback()
+        } else {
+            Log.d(TAG, "Controller not ready, queueing play action")
+            pendingPlayAction = startPlayback
         }
 
         _playbackState.update {
@@ -280,10 +300,19 @@ class PlayerManager @Inject constructor(
             createMediaItem(audiobook, chapter, index)
         }
 
-        controller?.apply {
-            setMediaItems(mediaItems, currentChapterIndex, positionInChapter)
-            prepare()
-            play()
+        val startPlayback: () -> Unit = {
+            controller?.apply {
+                setMediaItems(mediaItems, currentChapterIndex, positionInChapter)
+                prepare()
+                play()
+            }
+            Log.d(TAG, "Started playback from progress: ${audiobook.title}")
+        }
+
+        if (controller != null) {
+            startPlayback()
+        } else {
+            pendingPlayAction = startPlayback
         }
 
         _playbackState.update {
@@ -314,11 +343,20 @@ class PlayerManager @Inject constructor(
             createMediaItem(audiobook, chapter, index)
         }
 
-        controller?.apply {
-            setMediaItems(mediaItems, currentChapterIndex, positionInChapter)
-            setPlaybackSpeed(playbackSpeed)
-            prepare()
-            play()
+        val startPlayback: () -> Unit = {
+            controller?.apply {
+                setMediaItems(mediaItems, currentChapterIndex, positionInChapter)
+                setPlaybackSpeed(playbackSpeed)
+                prepare()
+                play()
+            }
+            Log.d(TAG, "Started playback from progress (index): ${audiobook.title}")
+        }
+
+        if (controller != null) {
+            startPlayback()
+        } else {
+            pendingPlayAction = startPlayback
         }
 
         _playbackState.update {
