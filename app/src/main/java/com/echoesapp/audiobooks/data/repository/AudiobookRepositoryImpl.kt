@@ -187,12 +187,16 @@ class AudiobookRepositoryImpl @Inject constructor(
         chapterId: String,
         position: Long,
     ): Result<Unit> = runCatching {
+        // Find chapter index from chapterId
+        val chapters = audiobookDao.getChaptersForAudiobook(audiobookId)
+        val chapterIndex = chapters.indexOfFirst { it.id == chapterId }.coerceAtLeast(0)
+        
         playbackProgressDao.upsertProgress(
             PlaybackProgressEntity(
                 bookId = audiobookId,
-                chapterId = chapterId,
-                position = position,
-                lastPlayed = System.currentTimeMillis(),
+                chapterIndex = chapterIndex,
+                positionMs = position,
+                lastPlayedAt = System.currentTimeMillis(),
             ),
         )
     }
@@ -213,15 +217,15 @@ class AudiobookRepositoryImpl @Inject constructor(
         audiobook: Audiobook,
         progress: PlaybackProgressEntity,
     ): AudiobookProgress {
-        val currentChapter = audiobook.chapters.find { it.id == progress.chapterId }
-        val totalProgress = calculateTotalProgress(audiobook, currentChapter, progress.position)
+        val currentChapter = audiobook.chapters.getOrNull(progress.chapterIndex)
+        val totalProgress = calculateTotalProgress(audiobook, currentChapter, progress.positionMs)
 
         return AudiobookProgress(
             audiobook = audiobook,
-            currentChapterId = progress.chapterId,
-            positionInChapter = progress.position,
+            currentChapterId = currentChapter?.id ?: "",
+            positionInChapter = progress.positionMs,
             percentComplete = totalProgress,
-            lastPlayedAt = progress.lastPlayed,
+            lastPlayedAt = progress.lastPlayedAt,
         )
     }
 
