@@ -35,6 +35,7 @@ import com.echoesapp.audiobooks.domain.model.Audiobook
 import com.echoesapp.audiobooks.domain.model.AudiobookProgress
 import com.echoesapp.audiobooks.ui.components.AdBanner
 import com.echoesapp.audiobooks.ui.components.AudiobookCard
+import com.echoesapp.audiobooks.ui.components.ContinueListeningCard
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,19 +125,30 @@ private fun LibraryContent(
         // Continue Listening Section
         if (continueListening.isNotEmpty()) {
             item {
-                LibrarySection(
-                    title = "Continue Listening",
-                    items = continueListening,
-                    onItemClick = onBookClick,
-                    keySelector = { it.audiobook.id },
-                    itemContent = { progress ->
-                        AudiobookCard(
-                            audiobook = progress.audiobook,
-                            onClick = { onBookClick(progress.audiobook.id) },
-                            progress = progress.percentComplete,
-                        )
-                    },
-                )
+                Column {
+                    Text(
+                        text = "Continue Listening",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        color = MaterialTheme.colorScheme.onBackground,
+                    )
+                    
+                    LazyRow(
+                        contentPadding = PaddingValues(horizontal = 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        items(
+                            items = continueListening,
+                            key = { it.audiobook.id },
+                        ) { progress ->
+                            ContinueListeningCard(
+                                progress = progress,
+                                onClick = { onBookClick(progress.audiobook.id) },
+                            )
+                        }
+                    }
+                }
                 Spacer(modifier = Modifier.height(24.dp))
             }
         }
