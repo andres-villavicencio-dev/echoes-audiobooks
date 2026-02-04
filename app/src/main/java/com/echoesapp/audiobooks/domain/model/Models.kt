@@ -37,6 +37,7 @@ data class PlaybackState(
     val audiobook: Audiobook? = null,
     val currentChapter: Chapter? = null,
     val isPlaying: Boolean = false,
+    val isBuffering: Boolean = false,
     val position: Long = 0L,
     val duration: Long = 0L,
     val playbackSpeed: Float = 1.0f,

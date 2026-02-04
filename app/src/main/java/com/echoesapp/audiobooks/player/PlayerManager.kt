@@ -121,9 +121,20 @@ class PlayerManager @Inject constructor(
 
         override fun onPlaybackStateChanged(playbackState: Int) {
             when (playbackState) {
-                Player.STATE_ENDED -> handleChapterEnded()
-                Player.STATE_READY -> updateDuration()
-                else -> {}
+                Player.STATE_BUFFERING -> {
+                    _playbackState.update { it.copy(isBuffering = true) }
+                }
+                Player.STATE_READY -> {
+                    _playbackState.update { it.copy(isBuffering = false) }
+                    updateDuration()
+                }
+                Player.STATE_ENDED -> {
+                    _playbackState.update { it.copy(isBuffering = false) }
+                    handleChapterEnded()
+                }
+                Player.STATE_IDLE -> {
+                    _playbackState.update { it.copy(isBuffering = false) }
+                }
             }
         }
 

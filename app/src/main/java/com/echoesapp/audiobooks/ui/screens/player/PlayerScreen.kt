@@ -34,6 +34,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -92,6 +93,7 @@ fun PlayerScreen(
             if (playbackState.audiobook != null) {
                 PlayerContent(
                     playbackState = playbackState,
+                    isBuffering = playbackState.isBuffering,
                     onPlayPauseClick = viewModel::togglePlayPause,
                     onPreviousClick = viewModel::skipPrevious,
                     onNextClick = viewModel::skipNext,
@@ -135,6 +137,7 @@ fun PlayerScreen(
 @Composable
 private fun PlayerContent(
     playbackState: PlaybackState,
+    isBuffering: Boolean,
     onPlayPauseClick: () -> Unit,
     onPreviousClick: () -> Unit,
     onNextClick: () -> Unit,
@@ -203,13 +206,26 @@ private fun PlayerContent(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        // Playback controls
-        PlaybackControls(
-            isPlaying = playbackState.isPlaying,
-            onPlayPauseClick = onPlayPauseClick,
-            onPreviousClick = onPreviousClick,
-            onNextClick = onNextClick,
-        )
+        // Playback controls with buffering indicator
+        Box(
+            contentAlignment = Alignment.Center,
+        ) {
+            PlaybackControls(
+                isPlaying = playbackState.isPlaying,
+                onPlayPauseClick = onPlayPauseClick,
+                onPreviousClick = onPreviousClick,
+                onNextClick = onNextClick,
+            )
+
+            // Buffering indicator overlay
+            if (isBuffering) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(72.dp),
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                    strokeWidth = 3.dp,
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(32.dp))
 
