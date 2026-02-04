@@ -3,12 +3,14 @@ package com.echoesapp.audiobooks.player
 import android.content.ComponentName
 import android.content.Context
 import android.net.Uri
+import android.util.Log
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MediaMetadata
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import com.echoesapp.audiobooks.data.repository.ProgressRepository
 import com.echoesapp.audiobooks.domain.model.Audiobook
 import com.echoesapp.audiobooks.domain.model.Chapter
 import com.echoesapp.audiobooks.domain.model.PlaybackState
@@ -32,12 +34,25 @@ import javax.inject.Singleton
 /**
  * Singleton manager for audio playback using Media3.
  * Provides a clean API for controlling audiobook playback with StateFlow-based state updates.
+ * 
+ * Integrates with ProgressRepository for:
+ * - Automatic progress saving (every 10 seconds while playing)
+ * - Listening session tracking
+ * - Per-book playback speed memory
+ * - Cloud sync support
  */
 @Singleton
 class PlayerManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val sleepTimer: SleepTimer,
+    private val progressRepository: ProgressRepository,
 ) {
+    companion object {
+        private const val TAG = "PlayerManager"
+        private const val SAVE_INTERVAL_MS = 10_000L  // Save progress every 10 seconds
+        private const val SYNC_INTERVAL_MS = 30_000L  // Sync to cloud every 30 seconds
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -48,6 +63,12 @@ class PlayerManager @Inject constructor(
 
     private var currentAudiobook: Audiobook? = null
     private var currentChapterIndex: Int = 0
+    
+    // Session tracking
+    private var currentSessionId: String? = null
+    private var sessionStartTime: Long = 0L
+    private var lastSaveTime: Long = 0L
+    private var lastSyncTime: Long = 0L
 
     private var isInitialized = false
 
@@ -82,6 +103,12 @@ class PlayerManager @Inject constructor(
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
             _playbackState.update { it.copy(isPlaying = isPlaying) }
+            
+            if (isPlaying) {
+                onPlaybackStarted()
+            } else {
+                onPlaybackPaused()
+            }
         }
 
         override fun onPlaybackStateChanged(playbackState: Int) {
@@ -103,8 +130,85 @@ class PlayerManager @Inject constructor(
                 if (newIndex != currentChapterIndex) {
                     currentChapterIndex = newIndex
                     updateCurrentChapter()
+                    saveProgressNow() // Save when chapter changes
                 }
             }
+        }
+    }
+
+    /**
+     * Called when playback starts or resumes.
+     */
+    private fun onPlaybackStarted() {
+        val audiobook = currentAudiobook ?: return
+        
+        scope.launch(Dispatchers.IO) {
+            // Start a new listening session if we don't have one
+            if (currentSessionId == null) {
+                currentSessionId = progressRepository.startSession(audiobook.id, currentChapterIndex)
+                sessionStartTime = System.currentTimeMillis()
+                Log.d(TAG, "Started session: $currentSessionId")
+            }
+        }
+    }
+
+    /**
+     * Called when playback pauses.
+     */
+    private fun onPlaybackPaused() {
+        // Save progress immediately on pause
+        saveProgressNow()
+        
+        // End the current session
+        endCurrentSession()
+    }
+
+    /**
+     * End the current listening session.
+     */
+    private fun endCurrentSession() {
+        val sessionId = currentSessionId ?: return
+        val duration = System.currentTimeMillis() - sessionStartTime
+        
+        scope.launch(Dispatchers.IO) {
+            progressRepository.endSession(
+                sessionId = sessionId,
+                durationMs = duration,
+                toChapter = currentChapterIndex
+            )
+            Log.d(TAG, "Ended session: $sessionId, duration: ${duration / 1000}s")
+        }
+        
+        currentSessionId = null
+        sessionStartTime = 0L
+    }
+
+    /**
+     * Save progress immediately.
+     */
+    private fun saveProgressNow() {
+        val audiobook = currentAudiobook ?: return
+        val position = controller?.currentPosition ?: return
+        
+        scope.launch(Dispatchers.IO) {
+            progressRepository.savePosition(
+                bookId = audiobook.id,
+                chapterIndex = currentChapterIndex,
+                positionMs = position
+            )
+            lastSaveTime = System.currentTimeMillis()
+            Log.d(TAG, "Saved progress: chapter=$currentChapterIndex, position=$position")
+        }
+    }
+
+    /**
+     * Sync progress to cloud.
+     */
+    private fun syncToCloud() {
+        scope.launch(Dispatchers.IO) {
+            progressRepository.syncToCloud()
+            lastSyncTime = System.currentTimeMillis()
+            Log.d(TAG, "Synced to cloud")
         }
     }
 
@@ -115,6 +219,17 @@ class PlayerManager @Inject constructor(
         ensureInitialized()
         currentAudiobook = audiobook
         currentChapterIndex = startChapterIndex.coerceIn(0, audiobook.chapters.lastIndex)
+
+        // Load saved playback speed for this book
+        scope.launch(Dispatchers.IO) {
+            val savedProgress = progressRepository.getProgress(audiobook.id)
+            val savedSpeed = savedProgress?.playbackSpeed ?: 1.0f
+            
+            launch(Dispatchers.Main) {
+                controller?.setPlaybackSpeed(savedSpeed)
+                _playbackState.update { it.copy(playbackSpeed = savedSpeed) }
+            }
+        }
 
         val mediaItems = audiobook.chapters.mapIndexed { index, chapter ->
             createMediaItem(audiobook, chapter, index)
@@ -150,6 +265,17 @@ class PlayerManager @Inject constructor(
         currentChapterIndex = audiobook.chapters.indexOfFirst { it.id == chapterId }
             .takeIf { it >= 0 } ?: 0
 
+        // Load saved playback speed for this book
+        scope.launch(Dispatchers.IO) {
+            val savedProgress = progressRepository.getProgress(audiobook.id)
+            val savedSpeed = savedProgress?.playbackSpeed ?: 1.0f
+            
+            launch(Dispatchers.Main) {
+                controller?.setPlaybackSpeed(savedSpeed)
+                _playbackState.update { it.copy(playbackSpeed = savedSpeed) }
+            }
+        }
+
         val mediaItems = audiobook.chapters.mapIndexed { index, chapter ->
             createMediaItem(audiobook, chapter, index)
         }
@@ -167,6 +293,42 @@ class PlayerManager @Inject constructor(
                 isPlaying = true,
                 position = positionInChapter,
                 duration = audiobook.chapters.getOrNull(currentChapterIndex)?.duration ?: 0L,
+            )
+        }
+    }
+
+    /**
+     * Resume playback from saved progress using chapter index.
+     */
+    fun playFromProgress(
+        audiobook: Audiobook,
+        chapterIndex: Int,
+        positionInChapter: Long,
+        playbackSpeed: Float = 1.0f,
+    ) {
+        ensureInitialized()
+        currentAudiobook = audiobook
+        currentChapterIndex = chapterIndex.coerceIn(0, audiobook.chapters.lastIndex)
+
+        val mediaItems = audiobook.chapters.mapIndexed { index, chapter ->
+            createMediaItem(audiobook, chapter, index)
+        }
+
+        controller?.apply {
+            setMediaItems(mediaItems, currentChapterIndex, positionInChapter)
+            setPlaybackSpeed(playbackSpeed)
+            prepare()
+            play()
+        }
+
+        _playbackState.update {
+            it.copy(
+                audiobook = audiobook,
+                currentChapter = audiobook.chapters.getOrNull(currentChapterIndex),
+                isPlaying = true,
+                position = positionInChapter,
+                duration = audiobook.chapters.getOrNull(currentChapterIndex)?.duration ?: 0L,
+                playbackSpeed = playbackSpeed,
             )
         }
     }
@@ -245,6 +407,7 @@ class PlayerManager @Inject constructor(
             controller?.seekToNextMediaItem()
             currentChapterIndex++
             updateCurrentChapter()
+            saveProgressNow()
         }
     }
 
@@ -260,6 +423,7 @@ class PlayerManager @Inject constructor(
                 it.seekToPreviousMediaItem()
                 currentChapterIndex--
                 updateCurrentChapter()
+                saveProgressNow()
             }
         }
     }
@@ -273,16 +437,24 @@ class PlayerManager @Inject constructor(
             controller?.seekTo(chapterIndex, 0)
             currentChapterIndex = chapterIndex
             updateCurrentChapter()
+            saveProgressNow()
         }
     }
 
     /**
      * Set playback speed (0.5x to 2.0x).
+     * Also saves the speed preference for this book.
      */
     fun setPlaybackSpeed(speed: Float) {
         val clampedSpeed = speed.coerceIn(0.5f, 2.0f)
         controller?.setPlaybackSpeed(clampedSpeed)
         _playbackState.update { it.copy(playbackSpeed = clampedSpeed) }
+        
+        // Save speed preference for this book
+        val audiobook = currentAudiobook ?: return
+        scope.launch(Dispatchers.IO) {
+            progressRepository.updatePlaybackSpeed(audiobook.id, clampedSpeed)
+        }
     }
 
     /**
@@ -294,6 +466,24 @@ class PlayerManager @Inject constructor(
         val currentIndex = speeds.indexOfFirst { it >= currentSpeed }
         val nextIndex = if (currentIndex == -1 || currentIndex == speeds.lastIndex) 0 else currentIndex + 1
         setPlaybackSpeed(speeds[nextIndex])
+    }
+
+    /**
+     * Add a bookmark at the current position.
+     */
+    fun addBookmark(note: String? = null) {
+        val audiobook = currentAudiobook ?: return
+        val position = controller?.currentPosition ?: return
+        
+        scope.launch(Dispatchers.IO) {
+            val bookmarkId = progressRepository.addBookmark(
+                bookId = audiobook.id,
+                chapterIndex = currentChapterIndex,
+                positionMs = position,
+                note = note
+            )
+            Log.d(TAG, "Added bookmark: $bookmarkId at chapter=$currentChapterIndex, position=$position")
+        }
     }
 
     /**
@@ -343,9 +533,19 @@ class PlayerManager @Inject constructor(
     fun getCurrentChapterId(): String? = currentAudiobook?.chapters?.getOrNull(currentChapterIndex)?.id
 
     /**
+     * Get current chapter index.
+     */
+    fun getCurrentChapterIndex(): Int = currentChapterIndex
+
+    /**
      * Stop playback and release resources.
      */
     fun stop() {
+        // Save final progress before stopping
+        saveProgressNow()
+        endCurrentSession()
+        syncToCloud()
+        
         controller?.stop()
         controller?.clearMediaItems()
         sleepTimer.cancel()
@@ -366,11 +566,15 @@ class PlayerManager @Inject constructor(
         }
 
         // Auto-advance to next chapter if available
-        if (currentChapterIndex < audiobook.chapters.lastIndex) {
-            // The player handles auto-advancement via the playlist
-        } else {
+        if (currentChapterIndex >= audiobook.chapters.lastIndex) {
             // Audiobook finished
             _playbackState.update { it.copy(isPlaying = false) }
+            
+            // Mark as completed
+            scope.launch(Dispatchers.IO) {
+                progressRepository.markAsCompleted(audiobook.id)
+                Log.d(TAG, "Audiobook completed: ${audiobook.title}")
+            }
         }
     }
 
@@ -407,6 +611,17 @@ class PlayerManager @Inject constructor(
                 controller?.let { ctrl ->
                     if (ctrl.isPlaying) {
                         _playbackState.update { it.copy(position = ctrl.currentPosition) }
+                        
+                        // Periodic progress save
+                        val now = System.currentTimeMillis()
+                        if (now - lastSaveTime >= SAVE_INTERVAL_MS) {
+                            saveProgressNow()
+                        }
+                        
+                        // Periodic cloud sync
+                        if (now - lastSyncTime >= SYNC_INTERVAL_MS) {
+                            syncToCloud()
+                        }
                     }
                 }
                 delay(500) // Update every 500ms
@@ -415,6 +630,11 @@ class PlayerManager @Inject constructor(
     }
 
     fun release() {
+        // Final save before release
+        saveProgressNow()
+        endCurrentSession()
+        syncToCloud()
+        
         sleepTimer.cancel()
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
