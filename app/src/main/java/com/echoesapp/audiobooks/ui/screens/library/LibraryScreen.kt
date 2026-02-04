@@ -218,7 +218,7 @@ internal fun LibraryScreenTopBar(
                 fontWeight = FontWeight.Bold,
             )
         },
-        navigationIcon = {
+        actions = {
             IconButton(
                 onClick = onNavigateToSettings,
                 modifier = Modifier.testTag("settings_button"),
