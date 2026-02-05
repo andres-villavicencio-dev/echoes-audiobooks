@@ -51,7 +51,7 @@ class LibraryViewModel @Inject constructor(
         }
         viewModelScope.launch {
             // Observe continue listening
-            repository.getContinueListening(5)
+            repository.getContinueListening(10)
                 .catch { /* ignore errors */ }
                 .collect { continueListening ->
                     _uiState.update { it.copy(continueListening = continueListening.distinctBy { p -> p.audiobook.id }) }
